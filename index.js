@@ -12,8 +12,9 @@ dotenv.config();
 
 const app = express();
 
+// https://systrack-frontend.vercel.app
 app.use(cors({
-    origin: 'https://systrack-frontend.vercel.app',
+    origin: 'http://localhost:5173',
     credentials: true,
 }));
 
