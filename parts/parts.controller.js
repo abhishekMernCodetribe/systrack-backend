@@ -121,6 +121,18 @@ export const createPart = async (req, res) => {
     }
 };
 
+export const getBarcodeInfo = async(req, res) => {
+    try {
+        const { imageName } = req.params;
+        const part = await Parts.findOne({ barcodeImage: { $regex: imageName } });
+        if (!part) return res.status(404).json({ message: "Part not found" });
+        res.json(part);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+    }
+}
+
 export const updatePart = async (req, res) => {
     try {
         const partId = req.body._id;
