@@ -1,5 +1,8 @@
 import Parts, { partTypesConfig } from "./parts.model.js";
-import System from "../system/system.model.js"
+import System from "../system/system.model.js";
+import bwipjs from 'bwip-js';
+import fs from 'fs';
+import path from 'path';
 
 export const createPart = async (req, res) => {
     try {
@@ -77,6 +80,20 @@ export const createPart = async (req, res) => {
             return res.status(400).json({ errors });
         }
 
+        const pngBuffer = await bwipjs.toBuffer({
+            bcid: 'code128',
+            text: barcode,
+            scale: 3,
+            height: 10,
+            includetext: true,
+            textxalign: 'center'
+        });
+
+        const barcodeFileName = `${barcode}-${Date.now()}.png`;
+        const barcodePath = path.join('uploads/barcodes', barcodeFileName);
+
+        fs.writeFileSync(barcodePath, pngBuffer);
+
         const newPart = new Parts({
             partType,
             barcode,
@@ -88,7 +105,8 @@ export const createPart = async (req, res) => {
             status,
             unusableReason: status === 'Unusable' ? unusableReason : null,
             assignedSystem,
-            isMultiple
+            isMultiple,
+            barcodeImage: barcodePath
         });
 
         await newPart.save();

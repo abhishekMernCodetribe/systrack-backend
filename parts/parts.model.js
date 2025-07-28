@@ -10,10 +10,10 @@ export const partTypesConfig = {
     HDD: {
         isMultiple: false
     },
-    SSD:{
+    SSD: {
         isMultiple: false
     },
-    Monitor:{
+    Monitor: {
         isMultiple: false
     },
     Printer: {
@@ -24,7 +24,7 @@ export const partTypesConfig = {
     }
 };
 
-const  validPartTypes = Object.keys(partTypesConfig);
+const validPartTypes = Object.keys(partTypesConfig);
 
 const partSchema = mongoose.Schema({
     partType: {
@@ -35,12 +35,16 @@ const partSchema = mongoose.Schema({
     isMultiple: {
         type: Boolean,
         required: true,
-        default:false
+        default: false
     },
     barcode: {
         type: String,
         required: true,
         unique: true,
+    },
+    barcodeImage: {
+        type: String,
+        default: ''
     },
     serialNumber: {
         type: String,
