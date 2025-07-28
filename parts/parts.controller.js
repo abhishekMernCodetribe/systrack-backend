@@ -121,7 +121,7 @@ export const createPart = async (req, res) => {
     }
 };
 
-export const getBarcodeInfo = async(req, res) => {
+export const getBarcodeInfo = async (req, res) => {
     try {
         const { imageName } = req.params;
         const part = await Parts.findOne({ barcodeImage: { $regex: imageName } });
@@ -190,8 +190,14 @@ export const updatePart = async (req, res) => {
             errors.assignedSystem = `Part type (${partType}) can only be assigned to one system`;
         }
 
-        if (status === 'Unusable' && !unusableReason) {
-            errors.unusableReason = 'Unusable reason is required when status is (Unusable)';
+        const partAssigned = await Parts.findById(partId);
+
+        if (status === 'Unusable') {
+            if (Array.isArray(partAssigned.assignedSystem) && partAssigned.assignedSystem.length > 0) {
+                errors.unusableReason = 'Cannot mark as Unusable. This part is currently assigned to a system.';
+            } else if (!unusableReason?.trim()) {
+                errors.unusableReason = 'Unusable reason is required when status is "Unusable".';
+            }
         }
 
         const existingBarcode = await Parts.findOne({ barcode, _id: { $ne: partId } });
@@ -275,6 +281,9 @@ export const getFreeParts = async (req, res) => {
                         },
                         {
                             assignedSystem: []
+                        },
+                        {
+                            status: 'Active'
                         }
                     ]
                 }

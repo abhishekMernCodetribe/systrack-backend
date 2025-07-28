@@ -87,7 +87,7 @@ export const login = async (req, res) => {
 
     const JWT_SECRET = process.env.JWT_SECRET;
 
-    const token = await generateToken(user, "1h", JWT_SECRET);
+    const token = await generateToken(user, "24h", JWT_SECRET);
 
 
     const tokenExpiry = 60 * 60 * 1000;
