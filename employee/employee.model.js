@@ -28,6 +28,9 @@ const employeeSchema = mongoose.Schema({
             "Please provide a valid email address"
         ]
     },
+    password: {
+        type: String
+    },
     phone: {
         type: Number,
         required: [true, "Phone number is required"],

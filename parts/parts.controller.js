@@ -1,7 +1,7 @@
 import Parts, { partTypesConfig } from "./parts.model.js";
 import System from "../system/system.model.js";
 import bwipjs from 'bwip-js';
-import fs from 'fs';
+import fs, { stat } from 'fs';
 import path from 'path';
 
 export const createPart = async (req, res) => {
@@ -252,16 +252,30 @@ export const updatePart = async (req, res) => {
 
 export const getAllParts = async (req, res) => {
     try {
-        const { status, type } = req.query;
-        const query = {};
+        const { search = '', status = '', page = 1, limit = 10 } = req.query;
+        const query = {
+            partType: { $regex: search, $options: 'i' },
+        }
 
-        if (status) query.status = status;
-        if (type) query.type = type;
-        const parts = await Parts.find(query);
+        if (status) {
+            query.status = status;
+        }
 
-        if (parts.length == 0) return res.status(200).json({ success: true, message: "No Parts Found", parts });
+        const total = await Parts.countDocuments(query);
+        const parts = await Parts.find(query)
+            .skip((page - 1) * limit)
+            .limit(Number(limit))
+            .sort({ createdAt: -1 });
 
-        res.status(200).json({ success: true, message: "Parts fetched successfully", parts })
+        if (parts.length == 0) return res.status(404).json({ success: false, message: "No Parts Found", parts: [] });
+
+        return res.json({
+            message: "Parts fetched Successfully",
+            parts,
+            total,
+            totalPages: Math.ceil(total / limit),
+            currentPage: Number(page)
+        });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }

@@ -6,14 +6,24 @@ import mongoose from "mongoose";
 export const getDashboardStats = async (req, res) => {
     try {
         const totalSystems = await System.countDocuments();
+        const allocatedSystems = await System.countDocuments({status: "assigned"});
+        const unallocatedSystems = await System.countDocuments({status: {$ne: "assigned"}});
+
         const totalParts = await Part.countDocuments();
+        const activeParts = await Part.countDocuments({status: {$ne: "Unusable"}});
+        const unusableParts = await Part.countDocuments({status: "Unusable"});
+
         const totalEmployees = await Employee.countDocuments();
 
         return res.status(200).json({
             message: "All stats fetched",
             totalSystems,
+            allocatedSystems,
+            unallocatedSystems,
             totalParts,
-            totalEmployees,
+            activeParts,
+            unusableParts,
+            totalEmployees
         })
     } catch (error) {
         return res.status(500).json({ error: "Failed to fetch dashboard stats." });

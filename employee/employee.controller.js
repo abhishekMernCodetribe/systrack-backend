@@ -1,4 +1,13 @@
 import Employee from './employee.model.js';
+import nodemailer from "nodemailer";
+
+const transporter = nodemailer.createTransport({
+    service: 'Gmail',
+    auth: {
+        user: 'abhishekmern.codetribe@gmail.com',
+        pass: 'cecy xhha ping fwwq',
+    },
+});
 
 const isValidEmail = (email) => {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
