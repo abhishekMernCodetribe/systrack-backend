@@ -262,10 +262,30 @@ export const getAllParts = async (req, res) => {
         }
 
         const total = await Parts.countDocuments(query);
-        const parts = await Parts.find(query)
-            .skip((page - 1) * limit)
-            .limit(Number(limit))
-            .sort({ createdAt: -1 });
+        // const parts = await Parts.find(query)
+        //     .skip((page - 1) * limit)
+        //     .limit(Number(limit))
+        //     .sort({ createdAt: -1 });
+
+        const matchStage = {$match: query};
+
+        const parts = await Parts.aggregate([
+            matchStage,
+            {
+                $addFields: {
+                    lastActivity: {
+                        $cond: {
+                            if: {$gt: ["$updatedAt", "$createdAt"]},
+                            then: "$updatedAt",
+                            else: "$createdAt"
+                        }
+                    }
+                }
+            },
+            {$sort: {lastActivity: -1}},
+            { $skip: (page - 1) * limit },
+            { $limit: (Number(limit)) }
+        ])
 
         if (parts.length == 0) return res.status(404).json({ success: false, message: "No Parts Found", parts: [] });
 
