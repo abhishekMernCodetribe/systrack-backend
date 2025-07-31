@@ -2,16 +2,17 @@ import System from "./system.model.js";
 import Employee from "../employee/employee.model.js";
 import Part from '../parts/parts.model.js';
 import mongoose from "mongoose";
+import logAction from "../utils/logAction.js";
 
 export const getDashboardStats = async (req, res) => {
     try {
         const totalSystems = await System.countDocuments();
-        const allocatedSystems = await System.countDocuments({status: "assigned"});
-        const unallocatedSystems = await System.countDocuments({status: {$ne: "assigned"}});
+        const allocatedSystems = await System.countDocuments({ status: "assigned" });
+        const unallocatedSystems = await System.countDocuments({ status: { $ne: "assigned" } });
 
         const totalParts = await Part.countDocuments();
-        const activeParts = await Part.countDocuments({status: {$ne: "Unusable"}});
-        const unusableParts = await Part.countDocuments({status: "Unusable"});
+        const activeParts = await Part.countDocuments({ status: { $ne: "Unusable" } });
+        const unusableParts = await Part.countDocuments({ status: "Unusable" });
 
         const totalEmployees = await Employee.countDocuments();
 
@@ -50,19 +51,34 @@ export const createSystem = async (req, res) => {
         if (Object.keys(errors).length > 0) {
             return res.status(400).json({ errors });
         }
-
-        const system = await System.create({ name, parts, assignedTo, status });
+        const system = await System.create({
+            name,
+            parts,
+            assignedTo: EmployeeID || null,
+            status: EmployeeID ? 'assigned' : (status || 'available'),
+        });
 
         if (EmployeeID) {
+            const employee = await Employee.findById(EmployeeID);
+
+            if (!employee) {
+                return res.status(404).json({ message: "Employee not found" });
+            }
             await Employee.updateOne(
                 { _id: EmployeeID },
                 { $set: { allocatedSys: system._id } }
-            )
+            );
 
-            system.assignedTo = EmployeeID;
-            system.status = "assigned";
-
-            await system.save();
+            await logAction({
+                actionType: 'ASSIGN_SYSTEM',
+                entity: 'System',
+                entityId: system._id,
+                performedBy: req.user?._id,
+                details: {
+                    assignedTo: employee.name,
+                    employee_email: employee.email,
+                },
+            });
         }
 
         await Part.updateMany(
@@ -70,19 +86,22 @@ export const createSystem = async (req, res) => {
             { $set: { assignedSystem: system._id } }
         );
 
+        await system.save();
+
         return res.status(201).json({
             message: "System created successfully",
-            system
+            system,
         });
 
     } catch (err) {
-        console.error(err);
+        console.error("Create System Error:", err);
         return res.status(500).json({
             message: "Internal server error",
-            error: err.message
+            error: err.message,
         });
     }
 };
+
 
 export const updateSystemDetails = async (req, res) => {
     const { name, parts } = req.body;
@@ -184,14 +203,41 @@ export const getPartsBySystemId = async (req, res) => {
 
 export const getAllSystems = async (req, res) => {
     try {
-        const systems = await System.find().populate({
-            path: 'parts',
-            model: 'Parts'
-        }).populate('assignedTo', 'email');
+        const { search = '', status = '', page = 1, limit = 10 } = req.query;
+        const query = {};
 
-        if (!systems) return res.status(404).json({ message: "No employee found" });
+        if (search.trim() !== '') {
+            query.name = { $regex: search.trim(), $options: 'i' };
+        }
 
-        return res.status(200).json({ message: 'Systems fetched successfully', systems });
+        if (status === 'assigned') {
+            query.assignedTo = { $ne: null };
+        } else if (status === 'unassigned') {
+            query.assignedTo = null;
+        }
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const totalSystems = await System.countDocuments(query);
+
+        const systems = await System.find(query)
+            .skip(skip)
+            .limit(parseInt(limit))
+            .populate({
+                path: 'parts',
+                model: 'Parts'
+            })
+            .populate('assignedTo', 'email');
+
+        if (!systems) return res.status(404).json({ message: "No System found" });
+
+        return res.status(200).json({
+            message: 'Systems fetched successfully',
+            systems,
+            currentPage: parseInt(page),
+            totalPages: Math.ceil(totalSystems / limit),
+            totalSystems
+        })
     } catch (error) {
         return res.status(500).json({ error: error.message });
     }
@@ -205,6 +251,8 @@ export const unassignSystem = async (req, res) => {
         if (!system) {
             return res.status(404).json({ message: 'System not found' });
         }
+
+        const employee = system.assignedTo;
 
         await Employee.updateMany(
             { allocatedSys: system._id },
@@ -225,6 +273,20 @@ export const unassignSystem = async (req, res) => {
             },
             { new: true }
         ).populate('parts');
+
+
+        if (employee) {
+            await logAction({
+                actionType: 'UNASSIGN_SYSTEM',
+                entity: 'System',
+                entityId: systemId,
+                performedBy: req.user?._id,
+                details: {
+                    UnassignedFrom: employee.name || 'Unknown',
+                    employee_email: employee.email || 'Unknown'
+                }
+            });
+        }
 
         return res.status(200).json({
             message: 'System unassigned',
@@ -267,6 +329,17 @@ export const assignSystemToEmployee = async (req, res) => {
         system.assignedTo = EmployeeID;
         system.status = 'assigned';
         await system.save();
+
+        await logAction({
+            actionType: 'ASSIGN_SYSTEM',
+            entity: 'System',
+            entityId: systemId,
+            performedBy: req.user?._id,
+            details: {
+                assignedTo: employee.name,
+                employee_email: employee.email
+            }
+        })
 
         return res.status(200).json({
             message: 'System assigned to employee successfully',

@@ -122,17 +122,37 @@ export const getEmployeeDetails = async (req, res) => {
 
 export const getAllEmployees = async (req, res) => {
     try {
-        const employees = await Employee.find().populate({
-            path: 'allocatedSys',
-            populate: {
-                path: 'parts',
-                model: 'Parts'
-            }
-        })
+        const {search = '', page = 1, limit = 10} = req.query;
+        const query = {};
+
+        if(search.trim() !== ''){
+            query.email = {$regex: search.trim(), $options: 'i'};
+        }
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const totalEmployees = await Employee.countDocuments(query);
+
+        const employees = await Employee.find(query)
+                                        .skip(skip)
+                                        .limit(parseInt(limit))
+                                        .populate({
+                                            path: 'allocatedSys',
+                                            populate: {
+                                                path: 'parts',
+                                                model: 'Parts'
+                                            }
+                                        })
 
         if (!employees) return res.status(404).json({ message: "No employee found" });
 
-        return res.status(200).json({ message: 'Employees fetched successfully', employees });
+        return res.status(200).json({ 
+            message: 'Employees fetched successfully', 
+            employees,
+            currentPage: parseInt(page),
+            totalPages: Math.ceil(totalEmployees/limit),
+            totalEmployees
+        });
     } catch (error) {
         return res.status(500).json({ error: error.message });
     }

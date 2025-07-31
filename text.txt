@@ -1,0 +1,53 @@
+export const unassignSystem = async (req, res) => {
+    const { systemId } = req.params;
+
+    try {
+        const system = await System.findById(systemId).populate('assignedTo').populate('parts');
+        if (!system) {
+            return res.status(404).json({ message: 'System not found' });
+        }
+
+        const employee = system.assignedTo;
+
+        await Employee.updateMany(
+            { allocatedSys: system._id },
+            { $unset: { allocatedSys: "" } }
+        );
+
+        await Promise.all(
+            system.parts.map(part =>
+                Part.findByIdAndUpdate(part._id, { allocatedTo: null })
+            )
+        );
+
+        const updatedSystem = await System.findByIdAndUpdate(
+            systemId,
+            {
+                assignedTo: null,
+                status: 'unassigned',
+            },
+            { new: true }
+        ).populate('parts');
+
+        if (employee) {
+            await logAction({
+                actionType: 'UNASSIGN_SYSTEM',
+                entity: 'System',
+                entityId: systemId,
+                performedBy: req.user?._id,
+                details: {
+                    UnassignedFrom: employee.name || 'Unknown',
+                    employee_email: employee.email || 'Unknown'
+                }
+            });
+        }
+
+        return res.status(200).json({
+            message: 'System unassigned',
+            system: updatedSystem,
+        });
+    } catch (error) {
+        console.error("Unassignment failed:", error);
+        return res.status(500).json({ message: 'Unassignment failed', error });
+    }
+};
